@@ -1,0 +1,30 @@
+name: nexus_download
+description: "Nexus - a local-first Bilibili media collector for desktop, Android, and iOS."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  archive: ^3.6.1
+  crypto: ^3.0.6
+  file_selector: ^1.0.3
+  intl: ^0.20.2
+  path: ^1.9.0
+  path_provider: ^2.1.5
+  qr_flutter: ^4.1.0
+  xml: ^6.5.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
