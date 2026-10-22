@@ -558,7 +558,7 @@ class WorkspaceState extends ChangeNotifier {
     }
     final payload = const JsonEncoder.withIndent('  ').convert({
       'app': 'Nexus',
-      'version': '1.0.0',
+      'version': '0.1.0',
       'platform': Platform.operatingSystem,
       'generatedAt': DateTime.now().toIso8601String(),
       'preferences': settingsJson,
