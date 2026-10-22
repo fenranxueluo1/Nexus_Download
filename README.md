@@ -7,19 +7,19 @@
 > 当前仓库只在 Windows 上完成过完整构建和运行验证；macOS/Linux 需要分别在对应系统上构建验证。
 
 ## 功能
-
+支持下载的视频
 - B 站视频、番剧、课程、收藏夹、合集、系列、创作者投稿与稍后再看
 - YouTube 单视频、Shorts 与播放列表
 - X 公开视频帖子
 - 抖音公开视频，支持 `v.douyin.com` 分享短链
 - 分片下载、断点续传、并发任务、限速和 HTTP/HTTPS 代理
 - 视频/音频合并，字幕、弹幕、封面与 NFO 导出
-- B 站扫码登录、应用内 YouTube/X/抖音登录和 Cookie 导入
+- B 站扫码登录、软件内 YouTube/X/抖音登录和 Cookie 导入
 - 路径模板、输出方案、任务日志和完成记录
 
 ## 平台支持
 
-| 平台 | 下载 | 应用内登录 | 合并方式 | 说明 |
+| 平台 | 下载 | 软件内登录 | 合并方式 | 说明 |
 | --- | --- | --- | --- | --- |
 | Windows 10/11 x64 | 完整 | B 站、YouTube、X、抖音 | FFmpeg | 已验证 |
 | macOS 12+ | 完整（预期） | B 站、YouTube、X、抖音 | FFmpeg | 需在 macOS 上构建验证 |
@@ -31,7 +31,7 @@
 
 ## 使用流程
 
-1. 打开应用，进入“解析链接”页。
+1. 打开软件，进入“解析链接”页。
 2. 粘贴 B 站、YouTube、X 或抖音链接，点击解析。
 3. 选择要下载的视频、清晰度和输出方案。
 4. 点击“生成任务结果”，任务进入队列。
@@ -42,7 +42,7 @@
 - **保存位置**：所有任务和输出文件的根目录
 - **输出方案**：容器、清晰度、编码、封面、字幕和 NFO
 - **网络代理**：留空时自动检测系统代理和常见本机代理端口
-- **账号**：B 站扫码，YouTube/X/抖音应用内登录
+- **账号**：B 站扫码，YouTube/X/抖音软件内登录
 
 ## Windows
 
@@ -61,7 +61,7 @@
 系统要求：
 
 - Windows 10/11 x64
-- 应用内登录依赖 Microsoft Edge WebView2 Runtime；如果登录窗口空白，运行 `redist/MicrosoftEdgeWebView2Setup.exe`
+- 软件内登录依赖 Microsoft Edge WebView2 Runtime；如果登录窗口空白，运行 `redist/MicrosoftEdgeWebView2Setup.exe`
 
 ### 源码构建
 
@@ -93,7 +93,7 @@ chmod +x scripts/package_macos.sh
 ./scripts/package_macos.sh
 ```
 
-如果应用提示无法验证开发者，右键 App 选择“打开”，或执行：
+如果软件提示无法验证开发者，右键 App 选择“打开”，或执行：
 
 ```bash
 xattr -dr com.apple.quarantine nexus_download.app
@@ -102,7 +102,7 @@ xattr -dr com.apple.quarantine nexus_download.app
 需要：
 
 - macOS 12+
-- 应用内登录依赖系统 WKWebView
+- 软件内登录依赖系统 WKWebView
 - FFmpeg；如果使用 Homebrew 版本，打包时需要 `dylibbundler`，也可以通过 `FFMPEG_PATH` 指定静态 ffmpeg
 
 ### 源码构建
@@ -139,7 +139,7 @@ flutter pub get
 flutter build linux --release
 ```
 
-Linux 没有 `flutter_inappwebview` 实现，因此不显示 YouTube/X/抖音应用内登录按钮。YouTube 可在设置中手动选择 `cookies.txt`；X、抖音只能使用公开内容。
+Linux 没有 `flutter_inappwebview` 实现，因此不显示 YouTube/X/抖音软件内登录按钮。YouTube 可在设置中手动选择 `cookies.txt`；X、抖音只能使用公开内容。
 
 ## Android
 
@@ -156,14 +156,14 @@ APK 路径：
 build/app/outputs/flutter-apk/app-release.apk
 ```
 
-安装时按系统提示允许“安装未知来源应用”。
+安装时按系统提示允许“安装未知来源软件”。
 
 ### 使用说明
 
 - B 站、X、抖音公开视频可用
 - 合并使用系统 MediaMuxer，只支持 MP4/M4A
-- 默认保存到应用专属目录；设置页可以恢复默认目录
-- 抖音支持应用内登录；YouTube/X 登录入口不显示
+- 默认保存到软件专属目录；设置页可以恢复默认目录
+- 抖音支持软件内登录；YouTube/X 登录入口不显示
 - 无法运行 yt-dlp/Deno，YouTube 使用纯 Dart 提取，部分视频会因为签名或机器人校验失败
 - 可在设置中手动填写 HTTP/HTTPS 代理
 
@@ -186,13 +186,13 @@ flutter build ios --release
 - iOS 15+
 - 合并使用 AVFoundation，只支持 MP4/M4A
 - B 站、X、抖音公开视频可用
-- 抖音支持应用内登录；YouTube/X 登录入口不显示
+- 抖音支持软件内登录；YouTube/X 登录入口不显示
 - 不能运行 yt-dlp/Deno，YouTube 能力受限
-- 支持应用专属目录和系统文件导出
+- 支持软件专属目录和系统文件导出
 
 ## 代理
 
-设置中的代理字段留空时，应用会自动：
+设置中的代理字段留空时，软件会自动：
 
 - 读取系统代理（Windows 注册表、macOS `scutil`、Linux 环境变量）
 - 探测常见本机代理端口：`7897`、`7890`、`1080`、`10808` 等
@@ -203,15 +203,15 @@ flutter build ios --release
 http://127.0.0.1:7897
 ```
 
-应用只使用代理，不会修改系统代理。应用内登录 WebView 使用系统代理；如果代理软件只开放本地端口但没有设置系统代理，登录窗口可能不经过该端口。
+软件只使用代理，不会修改系统代理。软件内登录 WebView 使用系统代理；如果代理软件只开放本地端口但没有设置系统代理，登录窗口可能不经过该端口。
 
 ## YouTube 说明
 
 桌面端优先使用 yt-dlp：
 
-- 首次解析时从 GitHub 下载 `yt-dlp` 到应用支持目录，并校验 SHA-256
+- 首次解析时从 GitHub 下载 `yt-dlp` 到软件支持目录，并校验 SHA-256
 - 首次解析时下载 Deno，用于解决 YouTube 签名和 `n` challenge
-- 也可以手动把 `yt-dlp.exe`/`yt-dlp` 和 `deno.exe`/`deno` 放入应用目录、`tools/`、`bin/` 或 `PATH`
+- 也可以手动把 `yt-dlp.exe`/`yt-dlp` 和 `deno.exe`/`deno` 放入软件目录、`tools/`、`bin/` 或 `PATH`
 
 YouTube 返回机器人校验时，在“账号”页登录 YouTube，或在设置中选择浏览器导出的 Netscape `cookies.txt`。
 
@@ -248,14 +248,14 @@ ZIP 本身不能用 Authenticode 签名；需要签名的是 `nexus_download.exe
 | [yt-dlp](https://github.com/yt-dlp/yt-dlp) | YouTube 解析和格式提取 | Unlicense |
 | [Deno](https://github.com/denoland/deno) | 执行 YouTube 播放器 JS 挑战 | MIT |
 | [FFmpeg](https://ffmpeg.org/) | 桌面端音视频合并和后处理 | GPL/LGPL，取决于构建 |
-| Microsoft Edge WebView2 Runtime | 应用内登录网页容器 | Microsoft 许可 |
+| Microsoft Edge WebView2 Runtime | 软件内登录网页容器 | Microsoft 许可 |
 | Microsoft Visual C++ Runtime | Windows 运行库 | Microsoft 许可 |
 
 ### Flutter 依赖
 
 | 包 | 用途 | 许可证 |
 | --- | --- | --- |
-| [flutter_inappwebview](https://pub.dev/packages/flutter_inappwebview) | 应用内登录 WebView | Apache-2.0 |
+| [flutter_inappwebview](https://pub.dev/packages/flutter_inappwebview) | 软件内登录 WebView | Apache-2.0 |
 | [youtube_explode_dart](https://pub.dev/packages/youtube_explode_dart) | 移动端 YouTube 元数据与流提取 | MIT |
 | [archive](https://pub.dev/packages/archive) | ZIP 解压 | MIT |
 | [crypto](https://pub.dev/packages/crypto) | SHA-256 校验 | BSD-3-Clause |
@@ -263,7 +263,7 @@ ZIP 本身不能用 Authenticode 签名；需要签名的是 `nexus_download.exe
 | [http](https://pub.dev/packages/http) | HTTP 请求 | BSD-3-Clause |
 | [intl](https://pub.dev/packages/intl) | 国际化格式化 | BSD-3-Clause |
 | [path](https://pub.dev/packages/path) | 路径处理 | BSD-3-Clause |
-| [path_provider](https://pub.dev/packages/path_provider) | 应用目录 | BSD-3-Clause |
+| [path_provider](https://pub.dev/packages/path_provider) | 软件目录 | BSD-3-Clause |
 | [qr_flutter](https://pub.dev/packages/qr_flutter) | B 站登录二维码 | BSD-3-Clause |
 | [xml](https://pub.dev/packages/xml) | XML/字幕处理 | MIT |
 | [cupertino_icons](https://pub.dev/packages/cupertino_icons) | 图标资源 | MIT |
