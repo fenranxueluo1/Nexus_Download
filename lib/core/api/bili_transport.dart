@@ -24,11 +24,32 @@ class BiliTransport {
   late final HttpClient _client;
   String _cookie = '';
   String _proxyUrl = '';
+  String _tubeCookie = '';
+  String _chirpCookie = '';
+  String _douyinCookie = '';
 
   String get cookie => _cookie;
 
   set cookie(String value) {
     _cookie = value.trim();
+  }
+
+  String get tubeCookie => _tubeCookie;
+
+  set tubeCookie(String value) {
+    _tubeCookie = value.trim();
+  }
+
+  String get chirpCookie => _chirpCookie;
+
+  set chirpCookie(String value) {
+    _chirpCookie = value.trim();
+  }
+
+  String get douyinCookie => _douyinCookie;
+
+  set douyinCookie(String value) {
+    _douyinCookie = value.trim();
   }
 
   String get proxy => _proxyUrl;
@@ -84,6 +105,15 @@ class BiliTransport {
         extra: headers,
         withCookie: withCookie,
       ).forEach(request.headers.set);
+      if (_tubeCookie.isNotEmpty && _isTubeHost(uri.host)) {
+        request.headers.set(HttpHeaders.cookieHeader, _tubeCookie);
+      }
+      if (_chirpCookie.isNotEmpty && _isChirpHost(uri.host)) {
+        request.headers.set(HttpHeaders.cookieHeader, _chirpCookie);
+      }
+      if (_douyinCookie.isNotEmpty && _isDouyinHost(uri.host)) {
+        request.headers.set(HttpHeaders.cookieHeader, _douyinCookie);
+      }
       return request;
     } on SocketException catch (error) {
       throw ApiException('网络连接失败：${error.message}');
@@ -270,4 +300,34 @@ class TransportResponse {
   }
 
   String get text => utf8.decode(body, allowMalformed: true);
+}
+
+bool _isTubeHost(String host) {
+  final value = host.toLowerCase();
+  return value == 'youtube.com' ||
+      value.endsWith('.youtube.com') ||
+      value == 'googlevideo.com' ||
+      value.endsWith('.googlevideo.com');
+}
+
+bool _isChirpHost(String host) {
+  final value = host.toLowerCase();
+  return value == 'x.com' ||
+      value.endsWith('.x.com') ||
+      value == 'twitter.com' ||
+      value.endsWith('.twitter.com') ||
+      value == 'twimg.com' ||
+      value.endsWith('.twimg.com');
+}
+
+bool _isDouyinHost(String host) {
+  final value = host.toLowerCase();
+  return value == 'douyin.com' ||
+      value.endsWith('.douyin.com') ||
+      value == 'iesdouyin.com' ||
+      value.endsWith('.iesdouyin.com') ||
+      value == 'amemv.com' ||
+      value.endsWith('.amemv.com') ||
+      value == 'douyinvod.com' ||
+      value.endsWith('.douyinvod.com');
 }

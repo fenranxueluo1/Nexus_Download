@@ -8,6 +8,10 @@ enum LinkKind {
   series,
   watchLater,
   shortLink,
+  tubeClip,
+  tubeList,
+  chirpPost,
+  douyinClip,
   unknown,
 }
 
@@ -23,6 +27,10 @@ class RecognizedLink {
     this.collectionId,
     this.collectionKind,
     this.url,
+    this.tubeId,
+    this.tubeListId,
+    this.chirpId,
+    this.douyinId,
   });
 
   final LinkKind kind;
@@ -35,6 +43,10 @@ class RecognizedLink {
   final int? collectionId;
   final String? collectionKind;
   final String? url;
+  final String? tubeId;
+  final String? tubeListId;
+  final String? chirpId;
+  final String? douyinId;
 
   bool get isKnown => kind != LinkKind.unknown;
 }
@@ -52,6 +64,10 @@ RecognizedLink recognizeLink(String raw) {
   }
   final firstLine = input.split(RegExp(r'[\r\n]')).first.trim();
   input = firstLine;
+  final embeddedUrl = RegExp(r'https?://[^\s，。]+').firstMatch(input);
+  if (embeddedUrl != null && !input.toLowerCase().startsWith('http')) {
+    input = embeddedUrl.group(0)!;
+  }
 
   final pureBv = _bvidPattern.firstMatch(input);
   if (pureBv != null && input.length <= 40 && !input.contains('http')) {
@@ -81,6 +97,57 @@ RecognizedLink recognizeLink(String raw) {
   final host = uri.host.toLowerCase();
   if (host.isEmpty) {
     return const RecognizedLink(kind: LinkKind.unknown);
+  }
+  if (_isTubeHost(host)) {
+    final params = uri.queryParameters;
+    final segments = uri.pathSegments
+        .where((segment) => segment.isNotEmpty)
+        .toList();
+    final listId = params['list'];
+    if (segments.isNotEmpty &&
+        segments.first == 'playlist' &&
+        listId != null &&
+        listId.isNotEmpty) {
+      return RecognizedLink(
+        kind: LinkKind.tubeList,
+        tubeListId: listId,
+        url: uri.toString(),
+      );
+    }
+    final videoId = params['v'] ?? _tubePathId(host, segments);
+    if (videoId != null && videoId.isNotEmpty) {
+      return RecognizedLink(
+        kind: LinkKind.tubeClip,
+        tubeId: videoId,
+        url: uri.toString(),
+      );
+    }
+    if (listId != null && listId.isNotEmpty) {
+      return RecognizedLink(
+        kind: LinkKind.tubeList,
+        tubeListId: listId,
+        url: uri.toString(),
+      );
+    }
+    return const RecognizedLink(kind: LinkKind.unknown);
+  }
+  if (_isChirpHost(host)) {
+    final chirpId = _chirpPathId(uri.pathSegments);
+    if (chirpId != null) {
+      return RecognizedLink(
+        kind: LinkKind.chirpPost,
+        chirpId: chirpId,
+        url: uri.toString(),
+      );
+    }
+    return const RecognizedLink(kind: LinkKind.unknown);
+  }
+  if (_isDouyinHost(host)) {
+    return RecognizedLink(
+      kind: LinkKind.douyinClip,
+      douyinId: _douyinPathId(uri),
+      url: uri.toString(),
+    );
   }
   if (host == 'b23.tv' ||
       host.endsWith('.b23.tv') ||
@@ -262,4 +329,60 @@ RecognizedLink recognizeLink(String raw) {
   }
 
   return const RecognizedLink(kind: LinkKind.unknown);
+}
+
+bool _isTubeHost(String host) {
+  return host == 'youtu.be' ||
+      host == 'youtube.com' ||
+      host.endsWith('.youtube.com') ||
+      host == 'youtube-nocookie.com' ||
+      host.endsWith('.youtube-nocookie.com');
+}
+
+bool _isChirpHost(String host) {
+  return host == 'x.com' ||
+      host.endsWith('.x.com') ||
+      host == 'twitter.com' ||
+      host.endsWith('.twitter.com');
+}
+
+bool _isDouyinHost(String host) {
+  return host == 'douyin.com' ||
+      host.endsWith('.douyin.com') ||
+      host == 'iesdouyin.com' ||
+      host.endsWith('.iesdouyin.com');
+}
+
+String? _douyinPathId(Uri uri) {
+  final modalId = uri.queryParameters['modal_id'];
+  if (modalId != null && RegExp(r'^\d+$').hasMatch(modalId)) {
+    return modalId;
+  }
+  final match = RegExp(r'/(?:video|note|share/video)/(\d+)')
+      .firstMatch(uri.path);
+  return match?.group(1);
+}
+
+String? _tubePathId(String host, List<String> segments) {
+  if (host == 'youtu.be' && segments.isNotEmpty) {
+    return segments.first;
+  }
+  if (segments.length >= 2 &&
+      (segments.first == 'shorts' ||
+          segments.first == 'live' ||
+          segments.first == 'embed' ||
+          segments.first == 'v')) {
+    return segments[1];
+  }
+  return null;
+}
+
+String? _chirpPathId(List<String> segments) {
+  for (var index = 0; index < segments.length - 1; index += 1) {
+    if ((segments[index] == 'status' || segments[index] == 'statuses') &&
+        RegExp(r'^\d+$').hasMatch(segments[index + 1])) {
+      return segments[index + 1];
+    }
+  }
+  return null;
 }

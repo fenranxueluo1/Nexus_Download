@@ -28,6 +28,9 @@ class Preferences {
     this.schemaVersion = 1,
     this.destinationRoot = '',
     this.packagerPath = '',
+    this.tubeCookiePath = '',
+    this.chirpCookiePath = '',
+    this.douyinCookiePath = '',
     this.parallelJobs = 3,
     this.parallelSegments = 4,
     this.retryLimit = 3,
@@ -50,6 +53,9 @@ class Preferences {
   final int schemaVersion;
   final String destinationRoot;
   final String packagerPath;
+  final String tubeCookiePath;
+  final String chirpCookiePath;
+  final String douyinCookiePath;
   final int parallelJobs;
   final int parallelSegments;
   final int retryLimit;
@@ -92,6 +98,9 @@ class Preferences {
     int? schemaVersion,
     String? destinationRoot,
     String? packagerPath,
+    String? tubeCookiePath,
+    String? chirpCookiePath,
+    String? douyinCookiePath,
     int? parallelJobs,
     int? parallelSegments,
     int? retryLimit,
@@ -114,6 +123,9 @@ class Preferences {
       schemaVersion: schemaVersion ?? this.schemaVersion,
       destinationRoot: destinationRoot ?? this.destinationRoot,
       packagerPath: packagerPath ?? this.packagerPath,
+      tubeCookiePath: tubeCookiePath ?? this.tubeCookiePath,
+      chirpCookiePath: chirpCookiePath ?? this.chirpCookiePath,
+      douyinCookiePath: douyinCookiePath ?? this.douyinCookiePath,
       parallelJobs: parallelJobs ?? this.parallelJobs,
       parallelSegments: parallelSegments ?? this.parallelSegments,
       retryLimit: retryLimit ?? this.retryLimit,
@@ -139,6 +151,9 @@ class Preferences {
     'schemaVersion': schemaVersion,
     'destinationRoot': destinationRoot,
     'packagerPath': packagerPath,
+    'tubeCookiePath': tubeCookiePath,
+    'chirpCookiePath': chirpCookiePath,
+    'douyinCookiePath': douyinCookiePath,
     'parallelJobs': parallelJobs,
     'parallelSegments': parallelSegments,
     'retryLimit': retryLimit,
@@ -163,6 +178,9 @@ class Preferences {
       schemaVersion: (json['schemaVersion'] as num?)?.toInt() ?? 1,
       destinationRoot: json['destinationRoot'] as String? ?? '',
       packagerPath: json['packagerPath'] as String? ?? '',
+      tubeCookiePath: json['tubeCookiePath'] as String? ?? '',
+      chirpCookiePath: json['chirpCookiePath'] as String? ?? '',
+      douyinCookiePath: json['douyinCookiePath'] as String? ?? '',
       parallelJobs: ((json['parallelJobs'] as num?)?.toInt() ?? 3).clamp(1, 5),
       parallelSegments: (json['parallelSegments'] as num?)?.toInt() ?? 4,
       retryLimit: ((json['retryLimit'] as num?)?.toInt() ?? 3).clamp(0, 10),

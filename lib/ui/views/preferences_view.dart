@@ -12,7 +12,9 @@ import '../../core/pathing/path_template.dart';
 import '../../core/workspace/workspace_state.dart';
 import '../../core/util/storage_paths.dart';
 import '../../core/util/identifiers.dart';
+import '../../core/util/proxy_detector.dart';
 import '../components/surfaces.dart';
+import '../sheets/tube_login_sheet.dart';
 
 typedef PreferencesDirtyCheck = bool Function();
 typedef PreferencesSaveAction = Future<bool> Function();
@@ -58,6 +60,7 @@ class PreferencesView extends StatefulWidget {
 class _PreferencesViewState extends State<PreferencesView> {
   final TextEditingController _destinationRoot = TextEditingController();
   final TextEditingController _packagerPath = TextEditingController();
+  final TextEditingController _tubeCookiePath = TextEditingController();
   final TextEditingController _proxy = TextEditingController();
   final TextEditingController _rateLimitKb = TextEditingController();
   final TextEditingController _pathTemplate = TextEditingController();
@@ -68,6 +71,7 @@ class _PreferencesViewState extends State<PreferencesView> {
   bool _initialized = false;
   bool _saving = false;
   bool _probing = false;
+  bool _detectingProxy = false;
   PackagerProbe? _probe;
   String? _pathError;
 
@@ -90,6 +94,7 @@ class _PreferencesViewState extends State<PreferencesView> {
     _draft = app.preferences;
     _destinationRoot.text = _draft.destinationRoot;
     _packagerPath.text = _draft.packagerPath;
+    _tubeCookiePath.text = _draft.tubeCookiePath;
     _proxy.text = _draft.proxy;
     _rateLimitKb.text = _draft.rateLimitBytesPerSecond > 0
         ? '${_draft.rateLimitBytesPerSecond ~/ 1024}'
@@ -105,6 +110,7 @@ class _PreferencesViewState extends State<PreferencesView> {
     widget.controller?.detach();
     _destinationRoot.dispose();
     _packagerPath.dispose();
+    _tubeCookiePath.dispose();
     _proxy.dispose();
     _rateLimitKb.dispose();
     _pathTemplate.dispose();
@@ -119,6 +125,7 @@ class _PreferencesViewState extends State<PreferencesView> {
     return _draft.copyWith(
       destinationRoot: _destinationRoot.text.trim(),
       packagerPath: _packagerPath.text.trim(),
+      tubeCookiePath: _tubeCookiePath.text.trim(),
       proxy: _proxy.text.trim(),
       pathTemplate: _pathTemplate.text.trim(),
       catalogTemplate: _catalogTemplate.text,
@@ -168,6 +175,30 @@ class _PreferencesViewState extends State<PreferencesView> {
     }
   }
 
+  Future<void> _detectProxy() async {
+    setState(() => _detectingProxy = true);
+    try {
+      final value = await ProxyDetector.detect();
+      if (!mounted) {
+        return;
+      }
+      if (value.isEmpty) {
+        _app?.showNotice('未检测到系统代理或常见本机代理端口', isError: true);
+        return;
+      }
+      setState(() {
+        _proxy.text = value;
+      });
+      _app?.showNotice('已检测到代理：$value');
+    } on Object catch (error) {
+      _app?.showNotice('检测代理失败：$error', isError: true);
+    } finally {
+      if (mounted) {
+        setState(() => _detectingProxy = false);
+      }
+    }
+  }
+
   Future<void> _pickDirectory() async {
     try {
       final path = await getDirectoryPath(confirmButtonText: '选择目录');
@@ -178,6 +209,41 @@ class _PreferencesViewState extends State<PreferencesView> {
       }
     } on Object catch (error) {
       _app?.showNotice('无法打开目录选择器：$error', isError: true);
+    }
+  }
+
+  Future<void> _loginTube() async {
+    try {
+      final path = await showTubeLoginSheet(context);
+      if (path == null || !mounted) {
+        return;
+      }
+      setState(() {
+        _tubeCookiePath.text = path;
+      });
+      final app = _app;
+      if (app != null) {
+        await _save(app);
+      }
+    } on Object catch (error) {
+      _app?.showNotice('打开 YouTube 登录失败：$error', isError: true);
+    }
+  }
+
+  Future<void> _pickTubeCookies() async {
+    try {
+      final file = await openFile(
+        acceptedTypeGroups: const [
+          XTypeGroup(label: 'Cookie 文件', extensions: ['txt', 'cookies']),
+        ],
+      );
+      if (file != null) {
+        setState(() {
+          _tubeCookiePath.text = file.path;
+        });
+      }
+    } on Object catch (error) {
+      _app?.showNotice('无法打开 Cookie 文件：$error', isError: true);
     }
   }
 
@@ -284,6 +350,8 @@ class _PreferencesViewState extends State<PreferencesView> {
           _buildBasics(app),
           const SizedBox(height: 12),
           _buildTransfer(app),
+          const SizedBox(height: 12),
+          _buildTube(),
           const SizedBox(height: 12),
           _buildPathRules(app, pathPreview, pathInvalid),
           const SizedBox(height: 12),
@@ -412,6 +480,74 @@ class _PreferencesViewState extends State<PreferencesView> {
     );
   }
 
+  bool get _canEmbeddedTubeLogin => Platform.isWindows || Platform.isMacOS;
+
+  Widget _buildTube() {
+    final theme = Theme.of(context);
+    final mobile = Platform.isIOS || Platform.isAndroid;
+    final description = mobile
+        ? '移动端暂不支持 yt-dlp Cookie，YouTube 仍使用纯 Dart 提取。'
+        : _canEmbeddedTubeLogin
+        ? '可直接在应用内登录 YouTube 获取 Cookie；内置登录使用系统代理，也可以选择已导出的 cookies.txt。'
+        : '当前平台不支持内置登录，请选择浏览器导出的 Netscape cookies.txt。';
+    return PanelCard(
+      title: 'YouTube 登录',
+      description: description,
+      child: mobile
+          ? Text(
+              '如需在移动端使用登录态，需要接入移动端 yt-dlp 运行时。',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _tubeCookiePath,
+                        decoration: const InputDecoration(
+                          labelText: 'Cookie 文件',
+                          hintText: 'cookies.txt；留空则匿名解析',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      onPressed: _pickTubeCookies,
+                      icon: const Icon(Icons.file_open),
+                      tooltip: '选择 Cookie 文件',
+                    ),
+                    if (_tubeCookiePath.text.trim().isNotEmpty)
+                      IconButton(
+                        onPressed: () => setState(_tubeCookiePath.clear),
+                        icon: const Icon(Icons.clear),
+                        tooltip: '清除 Cookie',
+                      ),
+                  ],
+                ),
+                if (_canEmbeddedTubeLogin) ...[
+                  const SizedBox(height: 8),
+                  FilledButton.tonalIcon(
+                    onPressed: _loginTube,
+                    icon: const Icon(Icons.login, size: 18),
+                    label: const Text('在应用内登录 YouTube'),
+                  ),
+                ],
+                const SizedBox(height: 6),
+                Text(
+                  'Cookie 只保存在本机凭据目录，仅用于 YouTube 请求。',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+
   Widget _buildTransfer(WorkspaceState app) {
     final theme = Theme.of(context);
     return PanelCard(
@@ -529,12 +665,31 @@ class _PreferencesViewState extends State<PreferencesView> {
             ],
           ),
           const SizedBox(height: 10),
-          TextField(
-            controller: _proxy,
-            decoration: const InputDecoration(
-              labelText: 'HTTP 代理',
-              hintText: 'http://127.0.0.1:7890，留空不使用',
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _proxy,
+                  decoration: const InputDecoration(
+                    labelText: 'HTTP 代理',
+                    hintText: '留空自动使用系统代理；也可填 http://127.0.0.1:7897',
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                onPressed: _detectingProxy ? null : _detectProxy,
+                icon: _detectingProxy
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.radar, size: 18),
+                label: Text(_detectingProxy ? '检测中' : '自动检测'),
+              ),
+            ],
           ),
           const SizedBox(height: 10),
           Row(

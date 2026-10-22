@@ -116,7 +116,7 @@ class _CollectViewState extends State<CollectView> {
           ),
           const SizedBox(height: 2),
           Text(
-            '粘贴链接或输入 BV / AV 号，挑选要保存的分段',
+            '粘贴 B 站、YouTube、X 或抖音链接，挑选要保存的内容',
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -132,8 +132,7 @@ class _CollectViewState extends State<CollectView> {
                   textInputAction: TextInputAction.go,
                   onSubmitted: (_) => _collect(app),
                   decoration: const InputDecoration(
-                    hintText:
-                        'BV1xx411c7mD 或 https://www.bilibili.com/video/...',
+                    hintText: 'BV1xx411c7mD、YouTube、X 或抖音链接',
                     prefixIcon: Icon(Icons.link),
                   ),
                 ),
@@ -178,7 +177,7 @@ class _CollectViewState extends State<CollectView> {
     return BlankSlate(
       icon: Icons.add_link,
       title: '从一个链接开始',
-      description: '支持视频、多分段、番剧、课程、收藏夹、合集、系列、创作者投稿与稍后再看。\n登录后可解析自己的收藏夹与订阅合集。',
+      description: '支持 B 站视频/番剧/收藏夹、YouTube 视频/播放列表、X 视频帖子和抖音视频。\n登录 B 站后可解析自己的收藏夹与订阅合集。',
       action: Wrap(
         spacing: 8,
         children: [
@@ -560,6 +559,9 @@ class _CollectViewState extends State<CollectView> {
       CatalogKind.season => '合集',
       CatalogKind.series => '系列',
       CatalogKind.watchLater => '稍后再看',
+      CatalogKind.tube => 'YouTube',
+      CatalogKind.chirp => 'X',
+      CatalogKind.douyin => '抖音',
       CatalogKind.unknown => '未知',
     };
   }

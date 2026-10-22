@@ -34,6 +34,11 @@ class CatalogIntake {
         return _resolveCollection(classified, rawInput);
       case LinkKind.watchLater:
         return _resolveWatchLater(rawInput);
+      case LinkKind.tubeClip:
+      case LinkKind.tubeList:
+      case LinkKind.chirpPost:
+      case LinkKind.douyinClip:
+        throw const ApiException('该链接需要由远程来源解析。');
       case LinkKind.shortLink:
       case LinkKind.unknown:
         throw const ApiException('无法识别的输入。');

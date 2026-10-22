@@ -8,6 +8,9 @@ enum CatalogKind {
   season('season'),
   series('series'),
   watchLater('watch_later'),
+  tube('tube'),
+  chirp('chirp'),
+  douyin('douyin'),
   unknown('unknown');
 
   const CatalogKind(this.wire);

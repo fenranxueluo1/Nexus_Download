@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -7,6 +8,7 @@ import '../../core/api/service_exception.dart';
 import '../../core/api/bili_gateway.dart';
 import '../../core/workspace/workspace_state.dart';
 import '../components/surfaces.dart';
+import '../sheets/tube_login_sheet.dart';
 
 class AccountView extends StatefulWidget {
   const AccountView({super.key, this.showTitle = true});
@@ -56,6 +58,118 @@ class _AccountViewState extends State<AccountView> {
       setState(() => _autoLoadRequested = false);
       await app.loadCollections();
     }
+  }
+
+  bool get _canWebLogin => Platform.isWindows || Platform.isMacOS;
+
+  bool get _canDouyinLogin =>
+      Platform.isWindows ||
+      Platform.isMacOS ||
+      Platform.isAndroid ||
+      Platform.isIOS;
+
+  Future<void> _loginYouTube(WorkspaceState app) async {
+    try {
+      final path = await showTubeLoginSheet(context);
+      if (path == null || !mounted) {
+        return;
+      }
+      await app.savePreferences(app.preferences.copyWith(tubeCookiePath: path));
+      if (!mounted) {
+        return;
+      }
+      setState(() {});
+      app.showNotice('YouTube Cookie 已保存');
+    } on ApiException catch (error) {
+      app.showNotice(error.message, isError: true);
+    } on Object catch (error) {
+      app.showNotice('YouTube 登录失败：$error', isError: true);
+    }
+  }
+
+  Future<void> _loginChirp(WorkspaceState app) async {
+    try {
+      final path = await showChirpLoginSheet(context);
+      if (path == null || !mounted) {
+        return;
+      }
+      await app.savePreferences(
+        app.preferences.copyWith(chirpCookiePath: path),
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {});
+      app.showNotice('X Cookie 已保存');
+    } on ApiException catch (error) {
+      app.showNotice(error.message, isError: true);
+    } on Object catch (error) {
+      app.showNotice('X 登录失败：$error', isError: true);
+    }
+  }
+
+  Widget _buildTubeButton(WorkspaceState app) {
+    final loggedIn = app.preferences.tubeCookiePath.isNotEmpty;
+    return FilledButton.tonalIcon(
+      onPressed: () => _loginYouTube(app),
+      icon: const Icon(Icons.smart_display_outlined, size: 18),
+      label: Text(loggedIn ? '重新登录 YouTube' : '登录 YouTube'),
+    );
+  }
+
+  Widget _buildChirpButton(WorkspaceState app) {
+    final loggedIn = app.preferences.chirpCookiePath.isNotEmpty;
+    return FilledButton.tonalIcon(
+      onPressed: () => _loginChirp(app),
+      icon: const Icon(Icons.alternate_email, size: 18),
+      label: Text(loggedIn ? '重新登录 X' : '登录 X'),
+    );
+  }
+
+  Future<void> _loginDouyin(WorkspaceState app) async {
+    try {
+      final path = await showDouyinLoginSheet(context);
+      if (path == null || !mounted) {
+        return;
+      }
+      await app.savePreferences(
+        app.preferences.copyWith(douyinCookiePath: path),
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {});
+      app.showNotice('抖音 Cookie 已保存');
+    } on ApiException catch (error) {
+      app.showNotice(error.message, isError: true);
+    } on Object catch (error) {
+      app.showNotice('抖音登录失败：$error', isError: true);
+    }
+  }
+
+  Widget _buildDouyinButton(WorkspaceState app) {
+    final loggedIn = app.preferences.douyinCookiePath.isNotEmpty;
+    return FilledButton.tonalIcon(
+      onPressed: () => _loginDouyin(app),
+      icon: const Icon(Icons.music_note, size: 18),
+      label: Text(loggedIn ? '重新登录抖音' : '登录抖音'),
+    );
+  }
+
+  Widget _buildRemoteLoginCard(WorkspaceState app) {
+    return PanelCard(
+      title: 'YouTube / X / 抖音账号',
+      description: '应用内网页登录，Cookie 只保存在本机。',
+      child: Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        children: [
+          if (_canWebLogin) _buildTubeButton(app),
+          if (_canWebLogin) _buildChirpButton(app),
+          if (_canDouyinLogin) _buildDouyinButton(app),
+        ],
+      ),
+    );
   }
 
   @override
@@ -112,16 +226,21 @@ class _AccountViewState extends State<AccountView> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         PanelCard(
-          title: '扫码登录',
-          description: '使用哔哩哔哩手机客户端扫描二维码，登录态只保存在本机。',
-          child: Row(
+          title: '账号登录',
+          description: 'B 站扫码登录；YouTube、X 与抖音使用应用内网页登录，登录态只保存在本机。',
+          child: Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               FilledButton.icon(
                 onPressed: () => _showQrLogin(app),
                 icon: const Icon(Icons.qr_code_2),
-                label: const Text('获取登录二维码'),
+                label: const Text('获取 B 站登录二维码'),
               ),
-              const SizedBox(width: 10),
+              if (_canWebLogin) _buildTubeButton(app),
+              if (_canWebLogin) _buildChirpButton(app),
+              if (_canDouyinLogin) _buildDouyinButton(app),
               TextButton(
                 onPressed: () => app.openPath('https://www.bilibili.com'),
                 child: const Text('打开 Bilibili'),
@@ -241,6 +360,10 @@ class _AccountViewState extends State<AccountView> {
             ],
           ),
         ),
+        if (_canWebLogin || _canDouyinLogin) ...[
+          const SizedBox(height: 12),
+          _buildRemoteLoginCard(app),
+        ],
         if (app.collectionsError != null) ...[
           const SizedBox(height: 10),
           Text(

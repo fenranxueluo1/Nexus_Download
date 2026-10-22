@@ -17,11 +17,19 @@ import '../domain/catalog.dart';
 import '../pathing/path_template.dart';
 import '../compose/job_composer.dart';
 import '../intake/catalog_intake.dart';
+import '../intake/link_recognizer.dart';
+import '../remote/chirp_gateway.dart';
+import '../remote/douyin_gateway.dart';
+import '../remote/remote_intake.dart';
+import '../remote/remote_planner.dart';
+import '../remote/tube_cookie.dart';
+import '../remote/tube_gateway.dart';
 import '../repository/job_repository.dart';
 import '../repository/credential_vault.dart';
 import '../repository/preferences_repository.dart';
 import '../util/storage_paths.dart';
 import '../util/privacy.dart';
+import '../util/proxy_detector.dart';
 
 class AccountCollections {
   const AccountCollections({
@@ -45,8 +53,21 @@ class WorkspaceState extends ChangeNotifier {
     required this.client,
     required this.preferences,
     required this.coordinator,
+    required this.effectiveProxy,
   }) : intake = CatalogIntake(client),
-       composer = JobComposer(client);
+       composer = JobComposer(client) {
+    tubeGateway = TubeGateway(
+      proxy: effectiveProxy,
+      cookiePath: preferences.tubeCookiePath,
+    );
+    chirpGateway = ChirpGateway(proxy: effectiveProxy);
+    douyinGateway = DouyinGateway(
+      proxy: effectiveProxy,
+      cookiePath: preferences.douyinCookiePath,
+    );
+    remoteIntake = RemoteIntake(tubeGateway, chirpGateway, douyinGateway);
+    remotePlanner = RemoteJobPlanner(tubeGateway, chirpGateway, douyinGateway);
+  }
 
   final PreferencesRepository preferencesRepository;
   final JobRepository jobRepository;
@@ -54,7 +75,13 @@ class WorkspaceState extends ChangeNotifier {
   final BiliGateway client;
   final CatalogIntake intake;
   final JobComposer composer;
+  late final TubeGateway tubeGateway;
+  late final ChirpGateway chirpGateway;
+  late final DouyinGateway douyinGateway;
+  late final RemoteIntake remoteIntake;
+  late final RemoteJobPlanner remotePlanner;
   final TransferCoordinator coordinator;
+  final String effectiveProxy;
   final ValueNotifier<int> tabIndex = ValueNotifier<int>(0);
 
   Preferences preferences;
@@ -93,15 +120,25 @@ class WorkspaceState extends ChangeNotifier {
     }
     final credentialVault = CredentialVault();
     await credentialVault.load();
+    final effectiveProxy = preferences.proxy.trim().isNotEmpty
+        ? preferences.proxy.trim()
+        : await ProxyDetector.detect();
     BiliGateway client;
     try {
       client = BiliGateway(
         cookie: credentialVault.cookie,
-        proxy: preferences.proxy,
+        proxy: effectiveProxy,
       );
     } on ApiException {
       client = BiliGateway(cookie: credentialVault.cookie);
     }
+    client.http.tubeCookie = readTubeCookieHeader(preferences.tubeCookiePath);
+    client.http.chirpCookie = readChirpCookieHeader(
+      preferences.chirpCookiePath,
+    );
+    client.http.douyinCookie = readDouyinCookieHeader(
+      preferences.douyinCookiePath,
+    );
     final jobRepository = JobRepository();
     final coordinator = TransferCoordinator(
       client: client,
@@ -116,6 +153,7 @@ class WorkspaceState extends ChangeNotifier {
       client: client,
       preferences: preferences,
       coordinator: coordinator,
+      effectiveProxy: effectiveProxy,
     );
     unawaited(state.refreshAccount(silent: true));
     return state;
@@ -200,7 +238,15 @@ class WorkspaceState extends ChangeNotifier {
     _pickedTrackIds.clear();
     notifyListeners();
     try {
-      catalog = await intake.ingest(trimmed);
+      final recognized = recognizeLink(trimmed);
+      final remote =
+          recognized.kind == LinkKind.tubeClip ||
+          recognized.kind == LinkKind.tubeList ||
+          recognized.kind == LinkKind.chirpPost ||
+          recognized.kind == LinkKind.douyinClip;
+      catalog = remote
+          ? await remoteIntake.ingest(trimmed)
+          : await intake.ingest(trimmed);
       if (catalog != null &&
           catalog!.items.length == 1 &&
           catalog!.items.first.tracks.length == 1) {
@@ -225,7 +271,13 @@ class WorkspaceState extends ChangeNotifier {
     pageError = null;
     notifyListeners();
     try {
-      catalog = await intake.fetchNextPage(current);
+      if (current.kind == CatalogKind.tube ||
+          current.kind == CatalogKind.chirp ||
+          current.kind == CatalogKind.douyin) {
+        catalog = await remoteIntake.fetchNextPage(current);
+      } else {
+        catalog = await intake.fetchNextPage(current);
+      }
     } on ApiException catch (error) {
       pageError = error.message;
     } on Object catch (error) {
@@ -264,16 +316,28 @@ class WorkspaceState extends ChangeNotifier {
             .toSet(),
         reservedPaths: coordinator.jobs.map((job) => job.destination).toSet(),
       );
-      final outcome = await composer.compose(
-        catalogKind: current.kind,
-        tracks: pickedTracks,
-        options: options,
-        onProgress: (done, total) {
-          composeDone = done;
-          composeTotal = total;
-          notifyListeners();
-        },
-      );
+      void onComposeProgress(int done, int total) {
+        composeDone = done;
+        composeTotal = total;
+        notifyListeners();
+      }
+
+      final outcome =
+          current.kind == CatalogKind.tube ||
+              current.kind == CatalogKind.chirp ||
+              current.kind == CatalogKind.douyin
+          ? await remotePlanner.compose(
+              catalogKind: current.kind,
+              tracks: pickedTracks,
+              options: options,
+              onProgress: onComposeProgress,
+            )
+          : await composer.compose(
+              catalogKind: current.kind,
+              tracks: pickedTracks,
+              options: options,
+              onProgress: onComposeProgress,
+            );
       final added = coordinator.admitJobs(outcome.jobs);
       final summary = <String>['已创建 $added 个任务'];
       if (outcome.skipped.isNotEmpty) {
@@ -433,11 +497,34 @@ class WorkspaceState extends ChangeNotifier {
             : '保存位置不可写，请选择其他目录。',
       );
     }
-    if (next.proxy.trim().isNotEmpty) {
-      client.proxy = next.proxy;
+    final effectiveProxy = next.proxy.trim().isNotEmpty
+        ? next.proxy.trim()
+        : await ProxyDetector.detect();
+    if (effectiveProxy.isNotEmpty) {
+      client.proxy = effectiveProxy;
     } else {
       client.proxy = '';
     }
+    tubeGateway.proxy = effectiveProxy;
+    chirpGateway.proxy = effectiveProxy;
+    douyinGateway.proxy = effectiveProxy;
+    final cookiePath = next.tubeCookiePath.trim();
+    if (cookiePath.isNotEmpty && !await File(cookiePath).exists()) {
+      throw const ApiException('YouTube Cookie 文件不存在，请重新选择。');
+    }
+    tubeGateway.cookiePath = cookiePath;
+    client.http.tubeCookie = readTubeCookieHeader(cookiePath);
+    final chirpCookiePath = next.chirpCookiePath.trim();
+    if (chirpCookiePath.isNotEmpty && !await File(chirpCookiePath).exists()) {
+      throw const ApiException('X Cookie 文件不存在，请重新登录。');
+    }
+    client.http.chirpCookie = readChirpCookieHeader(chirpCookiePath);
+    final douyinCookiePath = next.douyinCookiePath.trim();
+    if (douyinCookiePath.isNotEmpty && !await File(douyinCookiePath).exists()) {
+      throw const ApiException('抖音 Cookie 文件不存在，请重新登录。');
+    }
+    douyinGateway.cookiePath = douyinCookiePath;
+    client.http.douyinCookie = readDouyinCookieHeader(douyinCookiePath);
     await preferencesRepository.save(next);
     preferences = next;
     coordinator.updateSettings(next);
@@ -675,6 +762,9 @@ class WorkspaceState extends ChangeNotifier {
   void dispose() {
     coordinator.dispose();
     client.close();
+    tubeGateway.close();
+    chirpGateway.close();
+    douyinGateway.close();
     tabIndex.dispose();
     super.dispose();
   }

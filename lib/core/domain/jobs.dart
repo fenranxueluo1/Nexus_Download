@@ -269,12 +269,13 @@ class OutputRecipe {
     OutputProfile profile, {
     String? quality,
     String? codec,
+    OutputContainer? container,
   }) {
     return OutputRecipe(
       profileId: profile.id,
       quality: quality ?? profile.quality,
       codec: codec ?? profile.codec,
-      container: profile.container,
+      container: container ?? profile.container,
       includeVideo: profile.includeVideo,
       includeAudio: profile.includeAudio,
       includeArtwork: profile.includeArtwork,

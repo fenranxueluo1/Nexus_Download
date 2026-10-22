@@ -182,6 +182,8 @@ class MediaPackager {
     }
     if (audioIndex != null) {
       args.addAll(['-map', '$audioIndex:a:0']);
+    } else if (videoIndex != null && !dropAudio) {
+      args.addAll(['-map', '$videoIndex:a?']);
     }
     for (var index = 0; index < captionIndices.length; index += 1) {
       args.addAll(['-map', '${captionIndices[index]}:s:0']);
@@ -368,7 +370,7 @@ class MediaPackager {
       }
       throw ApiException('找不到 FFmpeg 可执行文件：$configured');
     }
-    if (Platform.isWindows) {
+    if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
       final bundled = await findBundledFfmpeg(Platform.resolvedExecutable);
       if (bundled != null) {
         return bundled;
@@ -420,15 +422,18 @@ class MediaPackager {
 
 Future<String?> findBundledFfmpeg(String executablePath) async {
   final base = File(executablePath).parent.path;
-  final candidates = <String>[
-    p.join(base, 'ffmpeg', 'ffmpeg.exe'),
-    p.join(base, 'ffmpeg.exe'),
-    p.join(base, 'ffmpeg', 'bin', 'ffmpeg.exe'),
-    p.join(base, 'bin', 'ffmpeg.exe'),
-  ];
-  for (final candidate in candidates) {
-    if (await File(candidate).exists()) {
-      return candidate;
+  final names = Platform.isWindows ? const ['ffmpeg.exe'] : const ['ffmpeg'];
+  for (final name in names) {
+    final candidates = <String>[
+      p.join(base, 'ffmpeg', name),
+      p.join(base, name),
+      p.join(base, 'ffmpeg', 'bin', name),
+      p.join(base, 'bin', name),
+    ];
+    for (final candidate in candidates) {
+      if (await File(candidate).exists()) {
+        return candidate;
+      }
     }
   }
   return null;
